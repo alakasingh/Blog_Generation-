@@ -1,56 +1,65 @@
 import streamlit as st
 import requests
 
-API_URL = "https://api-inference.huggingface.co/models/tiiuae/falcon-7b-instruct"
+# Hugging Face Inference API details
+API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-large"
 headers = {"Authorization": "Bearer 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"}
 
-from langchain import PromptTemplate
+# Function to get response from Flan-T5 model
+def getFlanResponse(input_text, no_words, blog_style):
+    try:
+        max_tokens = min(int(no_words) * 2, 250)  # Clamp to max 250 tokens
+    except ValueError:
+        return "Please enter a valid number of words."
 
-
-# Function to create response from Llama model
-def getLlamaResponse(input_text, no_words, blog_style):
-    # Prompt TEMPLATE
+    # Prompt template
     template = """
-    Write a blog for {} job profile for a topic "{}" within {} words.
+    Write a blog post suitable for a {} on the topic "{}". Limit it to approximately {} words. Make it clear, engaging, and informative.
     """
-    
-    # Creating the prompt using the provided input
     prompt = template.format(blog_style, input_text, no_words)
-    
-    # Sending the prompt to the Hugging Face API
-    response = requests.post(API_URL, headers=headers, json={"inputs": prompt})
-    
-    # Check if the response is successful
+
+    # Send request to Hugging Face API
+    response = requests.post(API_URL, headers=headers, json={
+        "inputs": prompt,
+        "parameters": {
+            "max_new_tokens": max_tokens,
+            "temperature": 0.7,
+            "top_p": 0.9
+        }
+    })
+
+    # Return generated text or error
     if response.status_code == 200:
-        # Parse and return the response text from the model
         return response.json()[0]["generated_text"]
     else:
         return f"Error: {response.status_code} - {response.text}"
 
-
-st.set_page_config(page_title="Generate Blogs",
-                   page_icon='🤖', 
+# Streamlit UI setup
+st.set_page_config(page_title="Generate Blogs 🤖",
+                   page_icon='📝', 
                    layout='centered',
                    initial_sidebar_state='collapsed')
 
 st.header("Generate Blogs 🤖")
 
+# User input fields
 input_text = st.text_input("Enter the Blog Topic")
 
-# Creating two more columns for additional fields
-col1, col2 = st.columns([5, 5])
-
+col1, col2 = st.columns(2)
 with col1:
-    no_words = st.text_input('No of Words')
+    no_words = st.text_input("No of Words")
 with col2:
-    blog_style = st.selectbox('Writing the Blog for', ('Researcher', 'Data Scientist', 'Common People'), index=0)
+    blog_style = st.selectbox("Writing the Blog for", 
+                              ['Researcher', 'Data Scientist', 'Common People'])
 
+# Generate button
 submit = st.button("Generate")
 
-# Final Response
+# Generate and display blog
 if submit:
     if input_text and no_words:
-        response = getLlamaResponse(input_text, no_words, blog_style)
-        st.write(response)
+        result = getFlanResponse(input_text, no_words, blog_style)
+        st.markdown("### ✍️ Generated Blog")
+        st.write(result)
     else:
-        st.write("Please fill in all fields.")
+        st.warning("Please fill in all fields.")
